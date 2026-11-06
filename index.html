@@ -156,7 +156,6 @@ tr:hover td{background:rgba(20,20,20,.5);}
 .chart-label{font-size:9px;color:var(--text3);}
 
 /* ===== PRINT ===== */
-@page{size:A4 portrait;margin:8mm;}
 @media print{
   body{background:#fff!important;color:#000!important;}
   #loginScreen,#app>.topbar,.sidebar,.no-print{display:none!important;}
@@ -579,10 +578,6 @@ html{-webkit-text-size-adjust:100%;}
                   <div class="form-group">
                     <label class="form-label">بەرواری عەرز</label>
                     <input class="form-input" id="q_date" type="date">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">مووچەتی چەند رۆژ (ئارەزوومەندانە)</label>
-                    <input class="form-input" id="q_valid" type="number" min="1" placeholder="7" value="7">
                   </div>
                   <div class="form-group form-full">
                     <label class="form-label">تێبینی / شتی تر</label>
@@ -1097,6 +1092,7 @@ html{-webkit-text-size-adjust:100%;}
 <!-- Toast -->
 <div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:12px 24px;border-radius:10px;font-size:13px;transition:transform .3s;z-index:9998;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:200px;text-align:center;"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 // ============================================================
 // DATA STORE
@@ -1136,13 +1132,13 @@ function initDB() {
 }
 
 function saveDB() {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e){}
   autoBackup();
 }
 
 function autoBackup() {
   const backupKey = 'pos_backup_' + new Date().toISOString().slice(0,10);
-  localStorage.setItem(backupKey, JSON.stringify(db));
+  try { localStorage.setItem(backupKey, JSON.stringify(db)); } catch(e){}
 }
 
 let db = loadDB();
@@ -1920,7 +1916,6 @@ function deleteInvoice(id) {
 function viewInvoice(id) {
   const inv = db.invoices.find(x=>x.id===id);
   if(!inv) return;
-  currentViewInvId = id;
   const c = db.customers.find(x=>x.id===inv.customerId);
   const payLbl = inv.payType==='full'?'نەقد تەواو':inv.payType==='debt'?'قەرز تەواو':'نیوێ نەقد / نیوێ قەرز';
   const html = `
@@ -1995,108 +1990,98 @@ function viewInvoice(id) {
   openModal('invoiceViewModal');
 }
 
-let currentViewInvId = null;
-
-// ---------- A4 print / save-as-PDF window ----------
-function openA4(title, content, fileName) {
-  const w = window.open('', '_blank');
-  if (!w) { showToast('پۆپئەپ بلۆک کراوە — ڕێگە پێبدە و دووبارە هەوڵبدەرەوە', 'error'); return; }
-  const safeName = String(fileName || 'faryad-tech').replace(/[^\w\-#.]/g, '_');
-  w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ku"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title}</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
-@page{size:A4 portrait;margin:8mm;}
-*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-html,body{margin:0;padding:0;background:#d9d9d9;font-family:'Noto Sans Arabic',sans-serif;direction:rtl;}
-.bar{position:sticky;top:0;z-index:10;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px;background:#5c0000;}
-.bar button{font-family:inherit;font-size:15px;font-weight:700;padding:11px 18px;border:none;border-radius:8px;cursor:pointer;background:#fff;color:#5c0000;}
-.bar button.pdf{background:#fff;}
-#wrap{padding:10px 0;overflow-x:hidden;}
-#sheet{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:8mm;box-shadow:0 2px 12px rgba(0,0,0,.3);}
-#sheet table{page-break-inside:auto;}
-#sheet tr{page-break-inside:avoid;}
-@media print{
-  html,body{background:#fff;}
-  .bar{display:none!important;}
-  #wrap{padding:0;}
-  #sheet{width:auto!important;min-height:0;margin:0;padding:0;box-shadow:none;zoom:1!important;}
-}
-</style></head><body>
-<div class="bar">
-  <button onclick="window.print()">🖨️ پرینت / سەیڤ وەک PDF</button>
-  <button class="pdf" id="pdfBtn" onclick="savePDF()">💾 داگرتنی PDF (A4)</button>
-  <button onclick="window.close()">✕ داخستن</button>
-</div>
-<div id="wrap"><div id="sheet">${content}</div></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-<script>
-var sheet=document.getElementById('sheet');
-function fit(){var W=document.documentElement.clientWidth,need=794;sheet.style.zoom=W<need+20?(W-12)/need:1;}
-fit();window.addEventListener('resize',fit);
-function savePDF(){
-  var btn=document.getElementById('pdfBtn');
-  if(typeof html2pdf==='undefined'){alert('html2pdf بار نەبوو — دوگمەی پرینت بەکاربهێنە و Save as PDF هەڵبژێرە');return;}
-  btn.textContent='⏳ چاوەڕێ بکە...';btn.disabled=true;
-  var z=sheet.style.zoom;sheet.style.zoom=1;
-  html2pdf().set({
-    margin:0,
-    filename:'${safeName}.pdf',
-    image:{type:'jpeg',quality:0.98},
-    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
-    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-    pagebreak:{mode:['css','legacy'],avoid:['tr']}
-  }).from(sheet).save().then(function(){sheet.style.zoom=z;btn.textContent='💾 داگرتنی PDF (A4)';btn.disabled=false;})
-  .catch(function(){sheet.style.zoom=z;btn.textContent='💾 داگرتنی PDF (A4)';btn.disabled=false;alert('هەڵە — دوگمەی پرینت بەکاربهێنە');});
-}
-<\/script>
-</body></html>`);
-  w.document.close();
-}
-
 function printInvoice() {
-  const content = document.getElementById('invoiceViewContent').innerHTML;
-  openA4('پسووڵە', content, 'faryad-invoice-' + (currentViewInvId || ''));
+  printHTML(document.getElementById('invoiceViewContent').innerHTML, 'پسووڵە');
+}
+
+function printHTML(html, title) {
+  const old=document.getElementById('printFrame'); if(old) old.remove();
+  const f=document.createElement('iframe'); f.id='printFrame';
+  f.setAttribute('aria-hidden','true');
+  f.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;background:#fff;';
+  document.body.appendChild(f);
+  const d=f.contentWindow.document;
+  d.open();
+  d.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>'+(title||' ')+'</title>'
+    +'<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700;900&display=swap">'
+    +'<style>@page{margin:8mm}body{font-family:\'Noto Sans Arabic\',sans-serif;direction:rtl;background:#fff;margin:0;padding:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style>'
+    +'</head><body>'+html+'</body></html>');
+  d.close();
+  let done=false;
+  const go=()=>{ if(done) return; done=true;
+    try{ f.contentWindow.focus(); f.contentWindow.print(); }
+    catch(e){ showToast('پرینت نەکرا — دوگمەی ناردن بە PDF بەکاربهێنە','error'); }
+    setTimeout(()=>{ if(f.parentNode) f.remove(); }, 60000);
+  };
+  const fontsReady = d.fonts && d.fonts.ready ? d.fonts.ready : Promise.resolve();
+  Promise.race([fontsReady, new Promise(r=>setTimeout(r,1500))]).then(()=>setTimeout(go,300));
 }
 
 function shareInvoiceWhatsApp() {
-  // Generate invoice text summary for WhatsApp
   const content = document.getElementById('invoiceViewContent');
-  if(!content) return;
-  // Get current invoice data from the displayed content
-  const title = content.querySelector('div[style*="font-size:18px"]')?.textContent || 'پسووڵە';
-  const phone = '07703204080';
-  const msg = encodeURIComponent(`📋 ${title}\n🏪 فریاد تەکنەلۆجی\n📞 ${phone}\n📍 کەلار — جادەی شقارتەکە\n\nبۆ وەسلی تەواو، تکایە پەیوەندیمان پێوە بکە.`);
-  // Open WhatsApp with the business number
-  const waUrl = `https://wa.me/964${phone.replace(/^0/,'')}?text=${msg}`;
-  window.open(waUrl, '_blank');
-  showToast('واتسئاپ کرایەوە ✅','success');
+  if(!content || !content.innerHTML.trim()) return;
+  sharePDFWhatsApp(content.innerHTML, 'Invoice-'+today()+'.pdf', '🧾 پسووڵە — فریاد تەکنەلۆجی');
 }
 
 function shareInvoicePDFWhatsApp(invId) {
   const inv = db.invoices.find(x=>x.id===invId);
-  if(!inv) return;
-  const c = db.customers.find(x=>x.id===inv.customerId);
-  const phone = '964' + '07703204080'.replace(/^0/,'');
-  // Build text summary
-  const lines = inv.items.map(it=>{
-    const p = db.products.find(x=>x.id===it.productId);
-    const name = p ? `${p.icon||'📦'} ${p.name}` : (it.customName||'کاڵا');
-    const line = it.sellPrice*it.qty*(1-(it.discount||0)/100);
-    return `• ${name} x${it.qty} = ${fmt(line)}`;
-  }).join('\n');
-  const msg = encodeURIComponent(
-    `🧾 *پسووڵە #${inv.id}*\n` +
-    `📅 ${inv.date}\n` +
-    `👤 کڕیار: ${c?c.name:'—'}\n\n` +
-    `${lines}\n\n` +
-    `💰 *کۆی گشتی: ${fmt(inv.total)}*\n` +
-    `${inv.debt>0?`⚠️ قەرز: ${fmt(inv.debt)}\n`:''}` +
-    `\n🏪 فریاد تەکنەلۆجی | 📞 07703204080\n📍 کەلار — جادەی شقارتەکە، نزیک جوز و لوز`
-  );
-  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-  showToast('پسووڵە بۆ واتسئاپ نێردرا ✅','success');
+  const content = document.getElementById('invoiceViewContent');
+  if(!inv || !content || !content.innerHTML.trim()) return;
+  sharePDFWhatsApp(content.innerHTML, 'Invoice-'+inv.id+'.pdf', '🧾 پسووڵە #'+inv.id+' — فریاد تەکنەلۆجی');
+}
+
+
+// ============================================================
+// WHATSAPP AS PDF
+// ============================================================
+async function buildPDFFile(html, name){
+  const holder=document.createElement('div');
+  holder.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff;color:#111;direction:rtl;font-family:'Noto Sans Arabic',sans-serif;padding:10px;";
+  holder.innerHTML=html; document.body.appendChild(holder);
+  try{
+    if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+    const blob=await html2pdf().set({
+      margin:8, filename:name, image:{type:'jpeg',quality:0.95},
+      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).from(holder).outputPdf('blob');
+    return new File([blob],name,{type:'application/pdf'});
+  } finally { holder.remove(); }
+}
+function downloadPDFFile(file){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function showPDFSendOverlay(file,caption){
+  const old=document.getElementById('pdfSendOverlay'); if(old) old.remove();
+  const o=document.createElement('div'); o.id='pdfSendOverlay';
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  o.innerHTML='<div style="background:#0a0a0a;border:1px solid #5c0000;border-radius:16px;padding:24px;width:100%;max-width:340px;text-align:center;">'
+   +'<div style="font-size:40px;margin-bottom:8px;">📄</div>'
+   +'<div style="color:#fff;font-weight:700;margin-bottom:4px;">PDF ئامادەیە</div>'
+   +'<div style="color:#b3b3b3;font-size:12px;margin-bottom:18px;">'+file.name+'</div>'
+   +'<button id="pdfSendBtn" style="width:100%;padding:14px;border:none;border-radius:10px;background:#5c0000;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;">📤 ناردن بە واتسئاپ</button>'
+   +'<button id="pdfCloseBtn" style="width:100%;padding:12px;margin-top:10px;border:1px solid #5c0000;border-radius:10px;background:transparent;color:#fff;font-size:13px;font-family:inherit;cursor:pointer;">داخستن</button></div>';
+  document.body.appendChild(o);
+  document.getElementById('pdfCloseBtn').onclick=()=>o.remove();
+  document.getElementById('pdfSendBtn').onclick=async()=>{
+    try{ await navigator.share({files:[file],title:caption,text:caption}); o.remove(); }
+    catch(e){ if(e.name!=='AbortError'){ downloadPDFFile(file); showToast('PDF داگیرا — لە واتسئاپ هاوپێچی بکە','info'); } }
+  };
+}
+async function sharePDFWhatsApp(html, fileName, caption){
+  showToast('PDF ئامادە دەکرێت...','info');
+  let file;
+  try{ file=await buildPDFFile(html,fileName); }
+  catch(e){ showToast('نەتوانرا PDF دروست بکرێت','error'); return; }
+  const data={files:[file],title:caption,text:caption};
+  if(navigator.canShare && navigator.canShare(data)){
+    try{ await navigator.share(data); return; }
+    catch(e){ if(e.name==='AbortError') return; showPDFSendOverlay(file,caption); return; }
+  }
+  downloadPDFFile(file);
+  window.open('https://wa.me/?text='+encodeURIComponent(caption),'_blank');
+  showToast('PDF داگیرا — لە واتسئاپ هاوپێچی بکە','info');
 }
 
 // ============================================================
@@ -2373,7 +2358,7 @@ function renderBackupPage() {
   // Stats
   const stats = document.getElementById('backupStats');
   if(stats) {
-    const lastBackup = Object.keys(localStorage).filter(k=>k.startsWith('pos_backup_')).sort().pop();
+    const lastBackup = (()=>{try{return Object.keys(localStorage).filter(k=>k.startsWith('pos_backup_')).sort().pop();}catch(e){return undefined;}})();
     stats.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>📦 <strong>${db.products.length}</strong> کاڵا</div>
@@ -2389,7 +2374,7 @@ function renderBackupPage() {
   // Auto backup list
   const autoList = document.getElementById('autoBackupList');
   if(!autoList) return;
-  const keys = Object.keys(localStorage).filter(k=>k.startsWith('pos_backup_')).sort().reverse();
+  const keys = (()=>{try{return Object.keys(localStorage).filter(k=>k.startsWith('pos_backup_')).sort().reverse();}catch(e){return [];}})();
   if(!keys.length) {
     autoList.innerHTML = '<div class="empty-state"><div class="empty-icon">📂</div>هیچ باکئاپی خۆکارێک نەدۆزرایەوە</div>';
     return;
@@ -2422,7 +2407,7 @@ function exportBackup() {
 }
 
 function exportSpecificBackup(key) {
-  const raw = localStorage.getItem(key);
+  let raw=null; try { raw = localStorage.getItem(key); } catch(e){}
   if(!raw) { showToast('داتا نەدۆزرایەوە','error'); return; }
   const blob = new Blob([raw], {type:'application/json'});
   const a = document.createElement('a');
@@ -2434,7 +2419,7 @@ function exportSpecificBackup(key) {
 
 function deleteAutoBackup(key) {
   if(!confirm('دڵنیایت لە سڕینەوەی ئەم باکئاپە؟')) return;
-  localStorage.removeItem(key);
+  try { localStorage.removeItem(key); } catch(e){}
   renderBackupPage();
   showToast('باکئاپ سڕایەوە','error');
 }
@@ -2640,7 +2625,6 @@ function buildQuoteHTML() {
   const customer = document.getElementById('q_customer').value||'—';
   const phone = document.getElementById('q_phone').value||'—';
   const date = document.getElementById('q_date').value||today();
-  const valid = document.getElementById('q_valid').value||'7';
   const note = document.getElementById('q_note').value||'';
   // هەموو ئایتمێک — حەتا بەتاڵیش قبوڵ دەکرێت
   const allItems = quoteItems.filter(it => it.qty > 0);
@@ -2682,7 +2666,6 @@ function buildQuoteHTML() {
       <div style="text-align:left;background:#f5f5f5;padding:12px 16px;border-radius:8px;border:1px solid #d4d4d4;">
         <div style="font-size:20px;font-weight:900;color:#5c0000;">وەسلی عەرز</div>
         <div style="font-size:12px;color:#808080;margin-top:4px;">📅 ${date}</div>
-        <div style="font-size:11px;color:#fff;margin-top:3px;">⏳ مووچەت: ${valid} رۆژ</div>
       </div>
     </div>
     <!-- کڕیار -->
@@ -2714,8 +2697,7 @@ function buildQuoteHTML() {
     <div style="margin-bottom:16px;padding:12px 16px;background:#f5f5f5;border:1px solid #d4d4d4;border-radius:8px;font-size:12px;color:#5c0000;line-height:1.8;">
       <strong style="font-size:13px;color:#5c0000;">⚠️ تێبینی گرنگ:</strong><br>
       ئەم وەسڵە تەنها بۆ دەرخستن و پێشنیارکردنی نرخەکانە.<br>
-      هیچ مامەڵەیەکی فرۆشتنی ڕەسمی نییە و هیچ مافی یاساییەکی بۆ کڕیار نادات.<br>
-      نرخەکان دەکرێت بگۆڕدرێن و تا کاتی مووچەت بەسەرچوون دەمێنێتەوە.
+      هیچ مامەڵەیەکی فرۆشتنی ڕەسمی نییە و هیچ مافی یاساییەکی بۆ کڕیار نادات.
     </div>
     <!-- فووتەر -->
     <div style="text-align:center;border-top:2px solid #5c0000;padding-top:14px;background:#f5f5f5;margin:-28px;margin-top:0;padding:14px 28px;border-radius:0 0 10px 10px;">
@@ -2726,26 +2708,11 @@ function buildQuoteHTML() {
 }
 
 function printQuote() {
-  openA4('وەسلی عەرز', buildQuoteHTML(), 'faryad-quote-' + today());
+  printHTML(buildQuoteHTML(), ' ');
 }
 
 function shareQuoteWhatsApp() {
-  const customer = document.getElementById('q_customer').value||'—';
-  const date = document.getElementById('q_date').value||today();
-  const allItems = quoteItems.filter(it => it.qty > 0);
-  let total=0;
-  const lines = allItems.map(it => {
-    const p = db.products.find(x=>x.id===it.productId);
-    const name = p ? `${p.icon||''} ${p.name}` : (it.customName||'');
-    const line = it.sellPrice*it.qty*(1-(it.discount||0)/100);
-    total += line;
-    return `• ${name} x${it.qty} = ${fmt(line)}`;
-  }).join('\n');
-  const msg = encodeURIComponent(
-    `📝 *وەسلی عەرز*\n📅 ${date}\n👤 ${customer}\n\n${lines}\n\n💰 *کۆی گشتی: ${fmt(total)}*\n\n⚠️ *ئەم وەسڵە هیچ کارێکی پێناکرێت — تەنها دەرخستەیە*\n🏪 فریاد تەکنەلۆجی | 📞 07703204080`
-  );
-  window.open(`https://wa.me/9647703204080?text=${msg}`, '_blank');
-  showToast('عەرز بۆ واتسئاپ نێردرا ✅','success');
+  sharePDFWhatsApp(buildQuoteHTML(), 'Quote-'+today()+'.pdf', '📝 وەسلی عەرز — فریاد تەکنەلۆجی');
 }
 
 // ============================================================
@@ -2917,7 +2884,7 @@ function buildQIHTML(invId) {
         </div>
       </div>
       <div style="text-align:left;background:#f5f5f5;padding:12px 16px;border-radius:8px;border:1px solid #d4d4d4;">
-        <div style="font-size:20px;font-weight:900;color:#5c0000;">⚡ وەسلی خێرا${invId?` #${invId}`:''}</div>
+        <div style="font-size:20px;font-weight:900;color:#5c0000;">${invId?`#${invId}`:''}</div>
         <div style="font-size:12px;color:#808080;margin-top:4px;">📅 ${dateStr}</div>
       </div>
     </div>
@@ -2979,28 +2946,17 @@ function saveQuickInvoice() {
   logActivity('وەسلی خێرا', `#${inv.id} — ${fmt(total)}`);
   saveDB();
   showToast('پاشەکەوتکرا ✅','success');
-  // A4 پرینت / PDF
-  openA4('وەسلی خێرا #'+inv.id, buildQIHTML(inv.id), 'faryad-quick-'+inv.id);
+  // پرینت
+  printHTML(buildQIHTML(inv.id), '#'+inv.id);
   initQuickInvoice();
 }
 
 function printQIOnly() {
-  openA4('وەسلی خێرا', buildQIHTML(null), 'faryad-quick-' + today());
+  printHTML(buildQIHTML(null), ' ');
 }
 
 function shareQIWhatsApp() {
-  const customer=document.getElementById('qi_customer').value||'';
-  let total=0;
-  const lines=qiItems.filter(it=>it.qty>0).map(it=>{
-    const p=db.products.find(x=>x.id===it.productId);
-    const name=p?`${p.icon||''} ${p.name}`:(it.customName||'');
-    const l=it.sellPrice*it.qty*(1-(it.discount||0)/100);
-    total+=l;
-    return `• ${name} x${it.qty} = ${fmt(l)}`;
-  }).join('\n');
-  const msg=encodeURIComponent(`⚡ *وەسلی خێرا*\n📅 ${today()}${customer?'\n👤 '+customer:''}\n\n${lines}\n\n💰 *کۆی گشتی: ${fmt(total)}*\n\n🏪 فریاد تەکنەلۆجی | 📞 07703204080`);
-  window.open(`https://wa.me/9647703204080?text=${msg}`,'_blank');
-  showToast('نێردرا بۆ واتسئاپ ✅','success');
+  sharePDFWhatsApp(buildQIHTML(null), 'Receipt-'+today()+'.pdf', '🧾 فریاد تەکنەلۆجی');
 }
 
 // ============================================================
